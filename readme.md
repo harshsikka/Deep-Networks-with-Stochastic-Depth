@@ -2,6 +2,8 @@
 
 The following is an implementation of *Deep Networks with Stochastic Depth* by Huang et al. 
 
+Running the model is as simple as downloading the files, installing tensorflow through conda or pip, and running train.py
+
 ## Paper Summary
 The authors propose a dynamic layer skipping scheme for deep neural networks that reduced training time significantly but
 allows for competitive performance on benchmark tasks.
