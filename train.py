@@ -9,80 +9,120 @@ tf.disable_eager_execution()
 # Cifar-10 Dataset Setup
 size = 32
 
-strides = [1, 2, 2]
-filter_sizes = [16, 32, 64]
-
 (train_images, train_labels), (test_images, test_labels) = datasets.cifar10.load_data()
 train_images = train_images / 255
 test_images = test_images / 255
-y_train = utils.to_categorical(train_labels, 10)
-y_test = utils.to_categorical(test_labels, 10)
 
-# Utility Functions
 
-def p_l(l, L, p_L):
+# calculate p_l from paper, the probability decay that determines the bernouli rv. Equation (4)
+def calc_p_l(l, L, p_L):
     decay = (l / L) * (1 - p_L)
-    return 1 - decay
+    p_l = 1 - decay
+    return p_l
+
+# calculate b_l from paper, determining activation of current ResBlock
+def calc_b_l(l, L, p_L):
+    p_l = calc_p_l(l, L, p_L)
+    return np.random.choice([1, 0], p=[p_l, 1 - p_l]) 
 
 # storage for blocks
 block_storage = []
 
-# input layer definition
+# input and output block definitions
 input_layers = tf.make_template('input_layers', model.inputLayers)
 output_layers = tf.make_template('output_layers', model.outputLayers)
 
-# output layer definition
-
+# initialize parameter sharing and store blocks
 for i in range(0,3):
     for j in range(0,18): 
         block_storage.append(tf.make_template('group_'+str(i)+'_block_'+str(j), model.resBlock))
-        
-        # add logic about being first of the 2nd and 3rd group here
 
-# initialize network
-data = tf.placeholder(tf.float32, [None, size, size, 3])
-label = tf.placeholder(tf.float32, [None,1])
+# function defining learning rule in equation (2) from paper
+def updateSubNetworkBlocks(start, end, input, filter, subgraph_length):
+    x = input
+    for i in range(start,end): 
+        b_l = calc_b_l(i,54,0.5)
+        if (b_l == 1):
+            subgraph_length += 1
 
-x = input_layers(data, 16, 3, 2)
+        x = tf.nn.relu(b_l * block_storage[i](x, filter, 1, 1) + x)
+    return x, subgraph_length
 
-x = block_storage[0](x, 16, 1, 1)
+# function defining evaluation rule in equation (6) from paper
+def updateFullNetworkBlocks(start, end, input, filter):
+    x = input
+    for i in range(start,end): 
+        p_l = calc_p_l(i,54,0.5)
+        x = tf.nn.relu(p_l * block_storage[i](x, filter, 1, 1) + x)
+    return x
 
-for i in range(1,18): 
-    x = tf.nn.relu(block_storage[i](x, 16, 1, 1) + x)
+# function to define subgraph creation and corresponding minibatch training
+def trainNetwork(block_storage, batch_images, batch_labels):
+    subgraph_length = 3
+    data = tf.placeholder(tf.float32, [None, size, size, 3])
+    label = tf.placeholder(tf.float32, [None,1])
 
-x = tf.nn.relu(block_storage[18](x, 32, 1, 1))
+    x = input_layers(data, 16, 3, 2)
+    x = block_storage[0](x, 16, 1, 1)
+    x, subgraph_length = updateSubNetworkBlocks( 1, 18, x, 16, subgraph_length)
+    x = tf.nn.relu(block_storage[18](x, 32, 1, 1))
+    x, subgraph_length = updateSubNetworkBlocks( 19, 36, x, 32, subgraph_length)
+    x = tf.nn.relu(block_storage[36](x, 64, 1, 1))
+    x, subgraph_length = updateSubNetworkBlocks( 37, 54, x, 64, subgraph_length)
+    x = output_layers(x)
+    loss = tf.reduce_mean(tf.nn.softmax_cross_entropy_with_logits(labels = label, logits=x))
 
-for i in range(19,36): 
-    x = tf.nn.relu(block_storage[i](x, 32, 1, 1) + x)
+    optimizer = tf.train.MomentumOptimizer(.1, .9, use_nesterov=True).minimize(loss)
+    tf.global_variables_initializer().run()
+    
+    sess.run(optimizer, feed_dict={
+        data: batch_images, label: batch_labels,
+        })
 
-x = tf.nn.relu(block_storage[36](x, 64, 1, 1))
+    # subgraph length aligns with length expectations in eq (5)
+    print('number of activated blocks in training: ' + str(subgraph_length)) 
 
-for i in range(37,54): 
-     x = tf.nn.relu(block_storage[i](x, 64, 1, 1) + x)
+# function to evaluate over the whole network
+def testNetwork(block_storage, batch_images, batch_labels):
+    data = tf.placeholder(tf.float32, [None, size, size, 3])
+    label = tf.placeholder(tf.float32, [None,1])
 
-x = output_layers(x)
-loss = tf.reduce_mean(tf.nn.softmax_cross_entropy_with_logits(labels = label, logits=x))
+    x = input_layers(data, 16, 3, 2)
+    x = block_storage[0](x, 16, 1, 1)
+    x = updateFullNetworkBlocks( 1, 18, x, 16)
+    x = tf.nn.relu(block_storage[18](x, 32, 1, 1))
+    x = updateFullNetworkBlocks( 19, 36, x, 32)
+    x = tf.nn.relu(block_storage[36](x, 64, 1, 1))
+    x = updateFullNetworkBlocks( 37, 54, x, 64)
+    x = output_layers(x)
+    loss = tf.reduce_mean(tf.nn.softmax_cross_entropy_with_logits(labels = label, logits=x))
 
-optimizer = tf.train.AdamOptimizer(.1).minimize(loss)
+    tf.global_variables_initializer().run()
+    loss_val =  loss.eval(feed_dict={
+        data: batch_images, label: batch_labels,
+    })
 
+    print('Loss: ', loss_val)
 
 #session
-
 with tf.Session() as sess:
-    tf.global_variables_initializer().run()
+    # setup train, val split
+    train_images = train_images[:45000]
+    val_images = train_images[45000:50000]
 
-    for i in range(1,2):
-        prev_idx = i - 1
-        
-        sess.run(optimizer, feed_dict={
-          data: train_images[prev_idx*100:i*100], label: train_labels[prev_idx*100:i*100]
-        })
+    train_labels = train_labels[:45000]
+    val_labels = train_labels[45000:50000]
 
-    loss_test = loss.eval(feed_dict={
-          data: train_images[1:3], label: train_labels[1:3]
-        })
+    #setup minibatches from paper
+    num_batches = len(train_images) // 128
 
-print(len(block_storage)) 
-print(train_images.shape)
-print(test_labels[0])
-print(loss_test)
+    # network initiliazation is happening directly within the session to dynamically create subgraphs for each minibatch
+    for epoch in range(500):
+        for i in range(num_batches):
+            print('Training Epoch: ' + str(epoch) + ' Minibatch: ' + str(i))
+            trainNetwork(block_storage, train_images[128*i: 128 + 128*i], train_labels[128*i: 128 + 128*i])
+            print('Testing Epoch: ' + str(epoch) + ' Minibatch: ' + str(i))
+            testNetwork(block_storage, train_images[128*i: 128 + 128*i], train_labels[128*i: 128 + 128*i])
+
+
+

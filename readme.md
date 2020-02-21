@@ -1,30 +1,5 @@
 # Deep Networks with Stochastic Depth
 
-Status:
-resnet blocks are generating and passing
-training is working
-next steps: 
-complete training process
-process should dynamically create graphs based on probability 
-and train them
-- probably try to do this within a session
-- review details of convolutional architecture in resnet
-
-Overall Approach:
-
-model res blocks and other layers
-store res block for later access
-
-setup selection probability function
-    outputs the prob for each layer
-
-setup training function
-    training function will access res block store and will connect resblocks
-    the probability for the given res block will be determined by the probability function, and will be factored into the connection
-
-setup testing function
-    will use updated test rule to account for all connections being active
-
 The following is an implementation of *Deep Networks with Stochastic Depth* by Huang et al. 
 
 ## Paper Summary
@@ -47,4 +22,17 @@ enough to tackle complex problems, but large ones face serious learning problems
 
 ### Proposed Solution
 
-The authors propose a 
+The authors propose a mechanism to skip layer updates stochastically, through a decaying probability. At training, layers may or may
+not get updated, so computation is saved. At testing, all layers are involved, allowing for utilization of the whole network. Another 
+perspective on this is that a given resnet becomes an ensemble of many smaller resnets that are basically graphs with skipped portions.
+The results are more than competitive. 
+
+## Implementation Details
+
+### Overview
+This implementation makes use of Tensorflow v1. The ResNet is built of the same repeated motif with different filter sizes, so a basic resnet
+building block is implemented and parameters are shared using tf.maketemplate to allow for subsequent updates. 
+
+During training, blocks are connected in the larger supergraph using the stochastic mechanism introduced in the paper. This leads to various
+subgraphs being generated and trained. For evaluation, the all the blocks are connected through the forward pass rule introduced in the paper, 
+and evaluated.
