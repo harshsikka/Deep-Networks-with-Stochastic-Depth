@@ -43,28 +43,35 @@ for i in range(0,3):
 data = tf.placeholder(tf.float32, [None, size, size, 3])
 label = tf.placeholder(tf.float32, [None,1])
 
-x = input_layers(data, 16, 3, 1)
+x = input_layers(data, 16, 3, 2)
 
-for i in range(0,17): 
-    x = block_storage[i](x, 16, 1, 2)
+x = block_storage[0](x, 16, 1, 1)
 
-for i in range(17,36): 
-    x = block_storage[i](x, 32, 1, 2)
+for i in range(1,18): 
+    x = tf.nn.relu(block_storage[i](x, 16, 1, 1) + x)
 
-for i in range(36,54): 
-    x = block_storage[i](x, 64, 1, 2)
+x = tf.nn.relu(block_storage[18](x, 32, 1, 1))
+
+for i in range(19,36): 
+    x = tf.nn.relu(block_storage[i](x, 32, 1, 1) + x)
+
+x = tf.nn.relu(block_storage[36](x, 64, 1, 1))
+
+for i in range(37,54): 
+     x = tf.nn.relu(block_storage[i](x, 64, 1, 1) + x)
 
 x = output_layers(x)
 loss = tf.reduce_mean(tf.nn.softmax_cross_entropy_with_logits(labels = label, logits=x))
 
 optimizer = tf.train.AdamOptimizer(.1).minimize(loss)
 
+
 #session
 
 with tf.Session() as sess:
     tf.global_variables_initializer().run()
 
-    for i in range(1,101):
+    for i in range(1,2):
         prev_idx = i - 1
         
         sess.run(optimizer, feed_dict={

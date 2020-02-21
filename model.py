@@ -28,7 +28,7 @@ def resBlock(inputs, filters, kernel_size, strides):
         
         x = tf.nn.relu(x)
 
-        x = convolution(x, filters, kernel_size, strides)
+        x = convolution(x, filters, kernel_size, 1)
         
         outputs = batch_norm(x)
 
