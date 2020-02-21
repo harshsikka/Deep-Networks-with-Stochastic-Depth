@@ -32,7 +32,7 @@ def inputLayers(inputs, filters, kernel_size, strides):
 
 def outputLayers(inputs):
         x = tf.keras.layers.GlobalAveragePooling2D()(inputs)
-        logits = tf.layers.dense(x,10)
+        logits = tf.layers.dense(x,10, tf.nn.relu)
         outputs = logits
         return outputs
           

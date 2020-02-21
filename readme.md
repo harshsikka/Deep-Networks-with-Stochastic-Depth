@@ -2,7 +2,23 @@
 
 The following is an implementation of *Deep Networks with Stochastic Depth* by Huang et al. 
 
-Running the model is as simple as downloading the files, installing tensorflow through conda or pip, and running train.py
+The only real dependency for this code is tensorflow. To run the network, you can use Conda to install tensorflow (and corresponding dependencies)
+and run train.py. 
+
+## Next Steps
+
+Given more time, the following should be implemented:
+
+1.) Tuning CNN parameters and improving network performance. Current experimental setup is limited because of lack of compute power
+and accuracy is low. This is on only 1-2 minibatches, and no validation or test set is being actively used because training the network
+to the point of realistic verification is not possible with laptop compute. 
+
+2.) Learning Rate scheduling: in the paper, learning rate grew to 0.1 over ~400 epochs in phases. Currently this implementation
+is only using 0.1 and seems to be having more trouble learning. 0.01 initially seems too slow based on briefly checking network performance.
+
+3.) Different projection functions, exploring more of what the original resnet paper proposed but with stochastic depth involved.
+
+4.) Implementing distributed computing for cluster tests
 
 ## Paper Summary
 The authors propose a dynamic layer skipping scheme for deep neural networks that reduced training time significantly but
@@ -40,3 +56,4 @@ subgraphs being generated and trained. For evaluation, the all the blocks are co
 and evaluated.
 
 The Stochastic Depth Mechanism reflects expectations outlined in the paper, i.e. for 54 resblock networks 40 blocks are trained in the subgraph. 
+

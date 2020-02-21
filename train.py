@@ -8,10 +8,18 @@ tf.disable_eager_execution()
 
 # Cifar-10 Dataset Setup
 size = 32
+num_classes = 10
 
 (train_images, train_labels), (test_images, test_labels) = datasets.cifar10.load_data()
 train_images = train_images / 255
 test_images = test_images / 255
+
+# Convert class vectors to binary class matrices.
+y_train = utils.to_categorical(train_labels, num_classes)
+y_test = utils.to_categorical(test_labels, num_classes)
+
+print(y_test.shape)
+
 
 
 # calculate p_l from paper, the probability decay that determines the bernouli rv. Equation (4)
@@ -60,7 +68,7 @@ def updateFullNetworkBlocks(start, end, input, filter):
 def trainNetwork(block_storage, batch_images, batch_labels):
     subgraph_length = 3
     data = tf.placeholder(tf.float32, [None, size, size, 3])
-    label = tf.placeholder(tf.float32, [None,1])
+    label = tf.placeholder(tf.float32, [None,10])
 
     x = input_layers(data, 16, 3, 2)
     x = block_storage[0](x, 16, 1, 1)
@@ -85,7 +93,7 @@ def trainNetwork(block_storage, batch_images, batch_labels):
 # function to evaluate over the whole network
 def testNetwork(block_storage, batch_images, batch_labels):
     data = tf.placeholder(tf.float32, [None, size, size, 3])
-    label = tf.placeholder(tf.float32, [None,1])
+    label = tf.placeholder(tf.float32, [None,10])
 
     x = input_layers(data, 16, 3, 2)
     x = block_storage[0](x, 16, 1, 1)
@@ -102,7 +110,15 @@ def testNetwork(block_storage, batch_images, batch_labels):
         data: batch_images, label: batch_labels,
     })
 
+    correct_pred = tf.equal(tf.argmax(x, 1), tf.argmax(label, 1))
+    accuracy = tf.reduce_mean(tf.cast(correct_pred, tf.float32), name='accuracy')
+
+    acc_val =  accuracy.eval(feed_dict={
+        data: batch_images, label: batch_labels,
+    })
+
     print('Loss: ', loss_val)
+    print('Accuracy: ', acc_val)
 
 #session
 with tf.Session() as sess:
@@ -120,9 +136,9 @@ with tf.Session() as sess:
     for epoch in range(500):
         for i in range(num_batches):
             print('Training Epoch: ' + str(epoch) + ' Minibatch: ' + str(i))
-            trainNetwork(block_storage, train_images[128*i: 128 + 128*i], train_labels[128*i: 128 + 128*i])
+            trainNetwork(block_storage, train_images[128*i: 128 + 128*i], y_train[128*i: 128 + 128*i])
             print('Testing Epoch: ' + str(epoch) + ' Minibatch: ' + str(i))
-            testNetwork(block_storage, train_images[128*i: 128 + 128*i], train_labels[128*i: 128 + 128*i])
-
+            testNetwork(block_storage, train_images[128*i: 128 + 128*i], y_train[128*i: 128 + 128*i])
+            
 
 
