@@ -36,3 +36,5 @@ building block is implemented and parameters are shared using tf.maketemplate to
 During training, blocks are connected in the larger supergraph using the stochastic mechanism introduced in the paper. This leads to various
 subgraphs being generated and trained. For evaluation, the all the blocks are connected through the forward pass rule introduced in the paper, 
 and evaluated.
+
+The Stochastic Depth Mechanism reflects expectations outlined in the paper, i.e. for 54 resblock networks 40 blocks are trained in the subgraph. 
